@@ -1,0 +1,9 @@
+[package]
+name = "netneighbor"
+version = "1.0.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4.0", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+chrono = { version = "0.4", features = ["serde"] }
