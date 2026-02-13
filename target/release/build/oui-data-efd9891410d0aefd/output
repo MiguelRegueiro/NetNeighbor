@@ -1,0 +1,9 @@
+Discarding duplicate OUI: 080030: ROYAL MELBOURNE INST OF TECH
+Discarding duplicate OUI: 080030: CERN
+Discarding duplicate OUI: 0001C8: CONRAD CORP.
+cargo:rerun-if-changed=data/oui.csv
+cargo:rerun-if-changed=data/oui28.csv
+cargo:rerun-if-changed=data/oui36.csv
+cargo:rerun-if-changed=data/cid.csv
+cargo:rerun-if-changed=data/iab.csv
+cargo:rerun-if-changed=build.rs

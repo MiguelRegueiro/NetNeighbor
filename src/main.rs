@@ -4,6 +4,8 @@ use std::process::Command;
 use std::thread;
 use std::time::{Duration, Instant};
 use chrono::Local;
+use colored::*;
+use oui_data::lookup;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -54,6 +56,45 @@ impl Device {
 struct TrackedDevice {
     device: Device,
     last_seen: Instant,
+}
+
+// Function to format device information with colors for better readability
+fn format_device_output(event: &str, ip: &str, mac: &str, interface: &str) {
+    let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+    // Get vendor information from MAC address
+    let vendor = get_vendor_from_mac(mac);
+
+    // Color the event based on connection type
+    let event_text = if event == "CONNECTED" {
+        format!("[{}] {}", timestamp, "[CONNECTED]".green())
+    } else {
+        format!("[{}] {}", timestamp, "[DISCONNECTED]".red())
+    };
+
+    if let Some(vendor_name) = vendor {
+        println!("{} IP: {} | MAC: {} | Vendor: {} | Interface: {}",
+                 event_text,
+                 ip.blue(),
+                 mac.yellow(),
+                 vendor_name.cyan(),
+                 interface.magenta());
+    } else {
+        println!("{} IP: {} | MAC: {} | Vendor: Unknown | Interface: {}",
+                 event_text,
+                 ip.blue(),
+                 mac.yellow(),
+                 interface.magenta());
+    }
+}
+
+// Function to get vendor name from MAC address
+fn get_vendor_from_mac(mac: &str) -> Option<String> {
+    // Use the oui-data crate to look up the vendor
+    match lookup(mac) {
+        Some(vendor) => Some(vendor.organization().to_string()),
+        None => None,
+    }
 }
 
 fn get_network_devices(interface: Option<&str>) -> Result<Vec<Device>, Box<dyn std::error::Error>> {
@@ -177,9 +218,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     // Check if this is a new connection
                     if !tracked_devices.contains_key(&key) {
-                        let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-                        println!("[{}] DEVICE CONNECTED - IP: {}, MAC: {}, Interface: {}",
-                                timestamp, device.ip_address, device.mac_address, device.interface);
+                        format_device_output("CONNECTED", &device.ip_address, &device.mac_address, &device.interface);
                     }
 
                     // Update the tracked device with current time
@@ -204,9 +243,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 // Report disconnections and remove from tracking
                 for (key, device) in keys_to_remove {
-                    let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-                    println!("[{}] DEVICE DISCONNECTED - IP: {}, MAC: {}, Interface: {}",
-                            timestamp, device.ip_address, device.mac_address, device.interface);
+                    format_device_output("DISCONNECTED", &device.ip_address, &device.mac_address, &device.interface);
                     tracked_devices.remove(&key);
                 }
 

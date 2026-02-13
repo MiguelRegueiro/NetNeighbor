@@ -1,0 +1,14 @@
+/home/regueiro/1Projects/wifi-monitor/NetNeighbor/target/debug/deps/serde-de1e4d4f61a351e1.d: /home/regueiro/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/regueiro/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/regueiro/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/regueiro/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/regueiro/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/regueiro/1Projects/wifi-monitor/NetNeighbor/target/debug/build/serde-b44e3bdfb61e7d8b/out/private.rs
+
+/home/regueiro/1Projects/wifi-monitor/NetNeighbor/target/debug/deps/libserde-de1e4d4f61a351e1.rlib: /home/regueiro/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/regueiro/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/regueiro/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/regueiro/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/regueiro/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/regueiro/1Projects/wifi-monitor/NetNeighbor/target/debug/build/serde-b44e3bdfb61e7d8b/out/private.rs
+
+/home/regueiro/1Projects/wifi-monitor/NetNeighbor/target/debug/deps/libserde-de1e4d4f61a351e1.rmeta: /home/regueiro/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/regueiro/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/regueiro/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/regueiro/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/regueiro/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/regueiro/1Projects/wifi-monitor/NetNeighbor/target/debug/build/serde-b44e3bdfb61e7d8b/out/private.rs
+
+/home/regueiro/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs:
+/home/regueiro/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs:
+/home/regueiro/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs:
+/home/regueiro/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs:
+/home/regueiro/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs:
+/home/regueiro/1Projects/wifi-monitor/NetNeighbor/target/debug/build/serde-b44e3bdfb61e7d8b/out/private.rs:
+
+# env-dep:OUT_DIR=/home/regueiro/1Projects/wifi-monitor/NetNeighbor/target/debug/build/serde-b44e3bdfb61e7d8b/out
