@@ -1,11 +1,13 @@
 use clap::Parser;
 use std::collections::HashMap;
 use std::process::Command;
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 use chrono::Local;
 use colored::*;
 use oui_data::lookup;
+use ctrlc;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -56,6 +58,13 @@ impl Device {
 struct TrackedDevice {
     device: Device,
     last_seen: Instant,
+}
+
+#[derive(Debug)]
+struct MonitoringStats {
+    total_devices_seen: usize,
+    peak_concurrent_devices: usize,
+    start_time: Instant,
 }
 
 // Function to format device information with colors for better readability
@@ -201,6 +210,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     println!("Press Ctrl+C to stop\n");
 
+    // Initialize monitoring statistics
+    let stats = Arc::new(Mutex::new(MonitoringStats {
+        total_devices_seen: 0,
+        peak_concurrent_devices: 0,
+        start_time: Instant::now(),
+    }));
+
+    // Store a clone for the signal handler
+    let stats_clone = Arc::clone(&stats);
+
+    // Set up Ctrl+C handler
+    ctrlc::set_handler(move || {
+        let stats = stats_clone.lock().unwrap();
+        
+        // Calculate duration
+        let duration = stats.start_time.elapsed();
+        let mins = duration.as_secs() / 60;
+        let secs = duration.as_secs() % 60;
+        
+        println!("\n{}", "=".repeat(50));
+        println!("{}", "NETNEIGHBOR SESSION SUMMARY".bold().yellow());
+        println!("{}", "=".repeat(50));
+        println!("Total devices seen: {}", stats.total_devices_seen);
+        println!("Peak concurrent devices: {}", stats.peak_concurrent_devices);
+        println!("Monitoring duration: {}m {}s", mins, secs);
+        println!("{}", "=".repeat(50));
+        
+        std::process::exit(0);
+    }).expect("Error setting Ctrl+C handler");
+
     let mut tracked_devices: HashMap<String, TrackedDevice> = HashMap::new();
 
     loop {
@@ -209,7 +248,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let now = Instant::now();
 
                 // Create a set of current device keys for O(1) lookup instead of O(n) vector search
-                let current_device_keys: std::collections::HashSet<String> = 
+                let current_device_keys: std::collections::HashSet<String> =
                     current_devices.iter().map(|d| d.key()).collect();
 
                 // Process current devices - update last seen time
@@ -219,6 +258,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // Check if this is a new connection
                     if !tracked_devices.contains_key(&key) {
                         format_device_output("CONNECTED", &device.ip_address, &device.mac_address, &device.interface);
+                        
+                        // Update stats for new device
+                        {
+                            let mut stats = stats.lock().unwrap();
+                            stats.total_devices_seen += 1;
+                        }
                     }
 
                     // Update the tracked device with current time
@@ -228,10 +273,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     });
                 }
 
+                // Update peak concurrent devices count
+                {
+                    let mut stats = stats.lock().unwrap();
+                    if tracked_devices.len() > stats.peak_concurrent_devices {
+                        stats.peak_concurrent_devices = tracked_devices.len();
+                    }
+                }
+
                 // Check for disconnections - devices not seen within timeout period
                 // Collect keys to remove to avoid borrowing issues
                 let mut keys_to_remove = Vec::new();
-                
+
                 for (key, tracked_device) in &tracked_devices {
                     if now.duration_since(tracked_device.last_seen).as_secs() > args.disconnect_timeout {
                         // Check if this device is still in current devices (it might have just been updated)
