@@ -1,16 +1,19 @@
 # NetNeighbor - Network Connection Monitor
 
-A lightweight, efficient command-line application that monitors network connections and disconnections by watching ARP (Address Resolution Protocol) and IP neighbor tables. The application prints real-time notifications to the terminal when devices connect to or disconnect from the network, supporting both WiFi and Ethernet connections.
+A lightweight, efficient command-line application that monitors network connections and disconnections by watching the Linux IP neighbor table. It prints real-time notifications when devices connect to or disconnect from your LAN, with defaults tuned to avoid Docker/VM bridge noise.
 
 ## Features
 
-- **Real-time monitoring**: Continuously watches ARP/IP neighbor tables for connected devices
+- **Real-time monitoring**: Continuously watches the kernel neighbor table for connected devices
 - **Connection detection**: Instantly reports when devices join the network
 - **Disconnection detection**: Alerts when devices leave the network (with configurable timeout)
-- **Multi-interface support**: Monitors all network interfaces simultaneously or filter to specific ones
-- **Technology agnostic**: Detects WiFi, Ethernet, and other network connections
-- **Configurable refresh rate**: Customizable polling interval to balance accuracy and system resources
+- **Smarter interface defaults**: Monitors routed interfaces by default (usually WiFi/Ethernet), with optional all-interface mode
+- **Multi-interface support**: Monitors all interfaces or a specific interface (`-n`)
+- **Faster detection defaults**: 1s polling, active discovery probes, and disconnect hysteresis to reduce false flapping
 - **Configurable disconnection timeout**: Adjustable timeout for considering devices disconnected
+- **Active discovery**: Optional periodic subnet probing to populate neighbor cache and find quieter devices (like phones)
+- **MAC-first tracking**: If one device has multiple IPs, only one entry is shown (best IP is selected)
+- **Terminal dashboard**: Two-column TUI-style view with current device status and connection/disconnection totals
 - **Interface identification**: Shows which interface each device is connected to
 - **Timestamped events**: All notifications include precise timestamps
 - **Cross-platform compatibility**: Works on Linux systems
@@ -21,7 +24,7 @@ A lightweight, efficient command-line application that monitors network connecti
 ### Prerequisites
 
 - Rust compiler and Cargo package manager (version 1.70 or later)
-- Access to system network commands (`ip`, `arp`)
+- Access to the `ip` command (`iproute2`)
 - Network interface with active connections
 
 ### Building from Source
@@ -48,7 +51,7 @@ After building, you can run the application directly:
 ## Usage
 
 ### Basic Usage
-Start monitoring with default settings (2-second refresh interval, 10-second disconnection timeout):
+Start monitoring with default settings (1-second refresh interval, 8-second disconnection timeout, active probe enabled, routed interfaces only):
 
 ```bash
 ./target/release/netneighbor
@@ -76,6 +79,21 @@ Run with custom interval and disconnection timeout:
 ./target/release/netneighbor --interval 3 --disconnect-timeout 15
 ```
 
+Monitor every interface (including Docker/bridge/VM links):
+```bash
+./target/release/netneighbor --all-interfaces
+```
+
+Disable active discovery probes:
+```bash
+./target/release/netneighbor --active-probe false
+```
+
+Use classic line-by-line output instead of dashboard:
+```bash
+./target/release/netneighbor --plain
+```
+
 ### Command Line Options
 
 ```
@@ -83,11 +101,18 @@ USAGE:
     netneighbor [OPTIONS]
 
 OPTIONS:
-    -i, --interval <INTERVAL>              Refresh interval in seconds [default: 2]
+    -i, --interval <INTERVAL>              Refresh interval in seconds [default: 1]
     -n, --interface <INTERFACE>            Network interface to monitor (e.g., wlan0, eth0)
-        --disconnect-timeout <SECONDS>     Disconnection timeout in seconds (device considered disconnected after not seen for this duration) [default: 10]
+    --disconnect-timeout <SECONDS>         Device considered disconnected after this many seconds without active confirmation [default: 8]
+    --min-missed-polls <N>                 Require this many missed polls before disconnecting [default: 3]
     -v, --verbose                          Show verbose output
-        --all-interfaces                   Monitor all interfaces [default: true if no interface specified]
+    --all-interfaces                       Monitor all interfaces (includes virtual/bridge links)
+    --active-probe <true|false>            Actively probe local subnets to discover quiet devices [default: true]
+    --probe-interval <SECONDS>             Seconds between active discovery sweeps [default: 8]
+    --probe-timeout-ms <MILLISECONDS>      TCP timeout per probe [default: 120]
+    --max-probe-hosts <N>                  Max hosts to probe per subnet [default: 256]
+    --include-ipv6                         Include IPv6 devices (disabled by default)
+    --plain                                Disable dashboard and print classic line events
     -h, --help                             Print help information
     -V, --version                          Print version information
 ```
@@ -96,15 +121,12 @@ OPTIONS:
 
 The application implements an intelligent monitoring algorithm:
 
-1. **Multi-source Data Collection**: Gathers data from both ARP table and IP neighbor table for comprehensive device detection
-2. **Device Tracking**: Maintains a registry of known devices with their last-seen timestamps
-3. **Connection Detection**: Identifies new devices when they appear in ARP/neighbor tables
-4. **Disconnection Detection**: Considers devices disconnected if not seen for longer than the timeout period
-5. **Interface Identification**: Reports which network interface each device is connected to
-6. **Event Reporting**: Prints timestamped notifications for each connection/disconnection event
-7. **Continuous Monitoring**: Repeats the process at the specified interval
-
-The application intelligently combines data from `arp -a -n` and `ip neigh show` commands for the most comprehensive device detection.
+1. **Interface Selection**: Uses `-n` if provided, otherwise routed interfaces by default, or all interfaces with `--all-interfaces`
+2. **Neighbor Collection**: Reads `ip neigh show` and parses valid entries with MAC + healthy neighbor states
+3. **Active Discovery (Optional)**: Periodically probes local IPv4 subnets to trigger ARP/neighbor resolution for quieter devices
+4. **Device Tracking**: Maintains a registry of known devices with last-seen timestamps
+5. **Connection/Disconnection Detection**: Prints events when devices appear or exceed disconnection timeout
+6. **Continuous Monitoring**: Repeats at the configured interval
 
 ## Example Output
 
@@ -114,7 +136,8 @@ Sample output showing device connections and disconnections:
 NetNeighbor - Network Connection Monitor
 Monitoring every 2 seconds
 Disconnection timeout: 10 seconds
-Monitoring all interfaces
+Monitoring routed interfaces: wlo1
+Active probing: enabled
 Press Ctrl+C to stop
 
 [2026-02-12 21:26:43] DEVICE CONNECTED - IP: 192.168.1.40, MAC: c8:a3:62:67:99:b2, Interface: wlo1
@@ -148,7 +171,9 @@ sudo ./target/release/netneighbor
 - **No devices detected**: Ensure your network interface is active and connected to a network with devices
 - **Permission errors**: Try running with `sudo` (though usually not required)
 - **Wrong interface**: Verify the interface name with `ip addr show` or `ifconfig`
-- **Command not found**: Make sure `ip` or `arp` commands are available on your system
+- **Too many Docker/VM interfaces shown**: Use default mode (no `--all-interfaces`) or select one interface with `-n`
+- **Some phones don't appear quickly**: Keep `--active-probe true` and reduce `--probe-interval` (for example, `--probe-interval 10`)
+- **Command not found**: Make sure `ip` is available on your system
 - **Delayed disconnection detection**: Some devices may remain in ARP cache longer than expected
 
 ### Verifying Network Interfaces
@@ -166,9 +191,6 @@ Look for interfaces with IP addresses assigned (usually in 192.168.x.x, 10.x.x.x
 
 You can verify the underlying data the application monitors:
 ```bash
-# ARP table
-arp -a -n
-
 # IP neighbor table
 ip neigh show
 ```
@@ -177,7 +199,7 @@ ip neigh show
 
 - **CPU Usage**: Minimal - mostly sleeping between checks
 - **Memory Usage**: Constant regardless of network size
-- **Network Impact**: Zero - only reads local system tables, no network traffic generated
+- **Network Impact**: Low - active probing creates lightweight local TCP attempts by default
 - **Refresh Interval**: Lower values provide faster detection but use slightly more CPU
 
 Recommended settings:
@@ -187,8 +209,9 @@ Recommended settings:
 ## Architecture & Implementation
 
 ### Components
-- **Main Application Loop**: Continuously polls the system's neighbor and ARP tables at defined intervals
-- **Device Parser**: Interprets output from multiple system commands (`arp -a -n` and `ip neigh show`)
+- **Main Application Loop**: Continuously polls the system's neighbor table at defined intervals
+- **Device Parser**: Interprets `ip neigh show` output with state/interface filtering
+- **Active Probe Engine**: Performs bounded subnet probing to improve neighbor cache coverage
 - **State Tracker**: Maintains a registry of known devices with timestamps of last detection
 - **Event Logger**: Formats and prints connection/disconnection events with timestamps
 - **CLI Interface**: Handles command-line arguments using the `clap` crate
@@ -199,13 +222,13 @@ Recommended settings:
 - `HashMap<String, TrackedDevice>`: Stores all detected devices with their last-seen times
 
 ### Optimization Features
-- **Single Shell Execution**: Combines ARP and IP neighbor commands into one shell call to reduce process overhead
 - **Efficient Lookups**: Uses HashSet for O(1) average lookup time during disconnection detection
-- **Smart Parsing**: Optimized string processing with minimal allocations during parsing
+- **Bounded Probing**: Caps probe count per subnet and timeout per probe
+- **Smart Parsing**: Filters invalid/incomplete neighbor entries to reduce noisy events
 
 ## Security Considerations
 
-- Requires read access to system ARP tables (typically available to all users)
+- Requires read access to the system neighbor table (typically available to all users)
 - Does not store or transmit sensitive network information
 - Does not modify system network state
 - Command injection risks are mitigated by using safe process spawning
@@ -229,11 +252,11 @@ The application uses Cargo for dependency management and building:
 
 ## Limitations
 
-- Detection delay depends on polling interval
+- Detection delay depends on polling interval and probe interval
 - Cannot distinguish between different types of disconnections (power off, network loss, etc.)
 - May miss very brief connections that occur between polling intervals
-- Accuracy depends on ARP table update timing in the kernel
-- Requires network commands (`ip`, `arp`) to be available in PATH
+- Accuracy depends on neighbor cache updates in the kernel
+- Requires the `ip` command to be available in PATH
 - Some devices (especially mobile devices) may remain in ARP cache longer than expected after disconnection
 
 ## Contributing
