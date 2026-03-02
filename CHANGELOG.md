@@ -7,8 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- No unreleased changes yet.
+### Changed
+- README restructured for faster scanning with quick-start-first layout and collapsible detail sections.
+- Primary run instructions now use `cargo run --release` instead of direct `target/release/netneighbor` commands.
+- Release/CI/changelog workflow guidance moved from README to `CONTRIBUTING.md`.
 
 ## [1.0.1] - 2026-03-02
 
