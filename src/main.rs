@@ -171,10 +171,10 @@ fn parse_ip_neigh_entries(
             if iface_val != filter {
                 continue;
             }
-        } else if let Some(allowed) = allowed_interfaces {
-            if !allowed.contains(iface_val) {
-                continue;
-            }
+        } else if let Some(allowed) = allowed_interfaces
+            && !allowed.contains(iface_val)
+        {
+            continue;
         }
 
         if !is_allowed_ip(ip, include_ipv6) {
@@ -476,10 +476,10 @@ fn active_probe_subnets(
             }));
             launched += 1;
 
-            if handles.len() >= max_parallel {
-                if let Some(handle) = handles.pop_front() {
-                    let _ = handle.join();
-                }
+            if handles.len() >= max_parallel
+                && let Some(handle) = handles.pop_front()
+            {
+                let _ = handle.join();
             }
         }
     }
@@ -536,16 +536,15 @@ fn terminal_size() -> (usize, usize) {
     let output = Command::new("sh")
         .args(["-c", "stty size 2>/dev/null"])
         .output();
-    if let Ok(out) = output {
-        if out.status.success() {
-            let content = String::from_utf8_lossy(&out.stdout);
-            let parts: Vec<&str> = content.split_whitespace().collect();
-            if parts.len() == 2 {
-                if let (Ok(rows), Ok(cols)) = (parts[0].parse::<usize>(), parts[1].parse::<usize>())
-                {
-                    return (cols.max(80), rows.max(24));
-                }
-            }
+    if let Ok(out) = output
+        && out.status.success()
+    {
+        let content = String::from_utf8_lossy(&out.stdout);
+        let parts: Vec<&str> = content.split_whitespace().collect();
+        if parts.len() == 2
+            && let (Ok(rows), Ok(cols)) = (parts[0].parse::<usize>(), parts[1].parse::<usize>())
+        {
+            return (cols.max(80), rows.max(24));
         }
     }
     (140, 40)
@@ -596,13 +595,14 @@ fn draw_dashboard(
         "{}{}{}",
         truncate_cell(&left_header, left_width).bold().yellow(),
         "|".bright_black(),
-        truncate_cell("GLOBAL STATS", right_width)
-            .bold()
-            .yellow()
+        truncate_cell("GLOBAL STATS", right_width).bold().yellow()
     )?;
 
     let mut right_lines = Vec::new();
-    right_lines.push(format!("Connections (All Devices): {}", metrics.total_connects));
+    right_lines.push(format!(
+        "Connections (All Devices): {}",
+        metrics.total_connects
+    ));
     right_lines.push(format!(
         "Disconnections (All Devices): {}",
         metrics.total_disconnects
@@ -855,15 +855,15 @@ fn run_monitor(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
             {
                 if let Ok(Some(state)) =
                     refresh_neighbor_state(&record.ip_address, &record.interface)
+                    && state != "FAILED"
+                    && state != "INCOMPLETE"
                 {
-                    if state != "FAILED" && state != "INCOMPLETE" {
-                        record.missed_polls = 0;
-                        record.last_probe_generation = probe_generation;
-                        if ACTIVE_NEIGHBOR_STATES.contains(&state.as_str()) {
-                            record.last_active = Instant::now();
-                        }
-                        continue;
+                    record.missed_polls = 0;
+                    record.last_probe_generation = probe_generation;
+                    if ACTIVE_NEIGHBOR_STATES.contains(&state.as_str()) {
+                        record.last_active = Instant::now();
                     }
+                    continue;
                 }
 
                 record.online = false;

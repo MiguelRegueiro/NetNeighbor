@@ -23,7 +23,7 @@ A lightweight, efficient command-line application that monitors network connecti
 
 ### Prerequisites
 
-- Rust compiler and Cargo package manager (version 1.70 or later)
+- Rust compiler and Cargo package manager (version 1.85 or later)
 - Access to the `ip` command (`iproute2`)
 - Network interface with active connections
 
@@ -233,7 +233,7 @@ Recommended settings:
 - Does not modify system network state
 - Command injection risks are mitigated by using safe process spawning
 - Input validation on command-line parameters
-- Only reads system information, no network traffic is generated
+- Reads neighbor/system information and can optionally generate lightweight local probe traffic when active probing is enabled
 
 ## Dependencies
 
@@ -249,6 +249,51 @@ The application uses Cargo for dependency management and building:
 - Development build: `cargo build`
 - Release build: `cargo build --release`
 - Run directly: `cargo run --bin netneighbor [options]`
+
+## Quality Gates (CI)
+
+Continuous Integration runs on every push to `main` and every pull request. The pipeline enforces:
+
+- Formatting checks (`cargo fmt --all -- --check`)
+- Lint checks with warnings treated as errors (`cargo clippy --all-targets --all-features -- -D warnings`)
+- Unit tests (`cargo test --all-targets --all-features`)
+- Release build verification (`cargo build --release`)
+
+You can run the same checks locally before pushing:
+
+```bash
+cargo fmt --all -- --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test --all-targets --all-features
+cargo build --release
+```
+
+## Release Process (CD)
+
+Releases are created automatically when you push a version tag:
+
+```bash
+git tag v1.0.1
+git push origin v1.0.1
+```
+
+Before tagging, ensure `Cargo.toml` has the same version (`1.0.1` for `v1.0.1`). The release workflow validates this and fails on mismatch.
+
+The release workflow will:
+
+- Re-run tests and build checks
+- Build the release binary (`target/release/netneighbor`)
+- Generate `SHA256SUMS.txt` for release artifacts
+- Extract release notes from `CHANGELOG.md` for the tagged version
+- Publish a GitHub Release with the binary, checksum file, and extracted notes
+
+## Changelog
+
+This repository follows Keep a Changelog style in [CHANGELOG.md](CHANGELOG.md).
+
+- Add user-visible changes under `## [Unreleased]` as work is merged
+- Cut a release section (for example `## [1.0.1] - 2026-03-02`) before tagging
+- Use tags in the format `vX.Y.Z` so the CD workflow can map tags to changelog sections
 
 ## Limitations
 
