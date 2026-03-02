@@ -30,7 +30,7 @@ jobs:
       - name: Validate tag matches Cargo.toml version
         run: |
           TAG_VERSION="${GITHUB_REF_NAME#v}"
-          CARGO_VERSION="$(grep -m1 '^version = ' Cargo.toml | sed -E 's/version = \"([^\"]+)\"/\\1/')"
+          CARGO_VERSION="$(awk -F '\"' '/^version = \"/ { print $2; exit }' Cargo.toml)"
 
           if [[ "${TAG_VERSION}" != "${CARGO_VERSION}" ]]; then
             echo "Tag/version mismatch: tag=${TAG_VERSION}, Cargo.toml=${CARGO_VERSION}" >&2
