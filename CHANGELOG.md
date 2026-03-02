@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Primary run instructions now use `cargo run --release` instead of direct `target/release/netneighbor` commands.
 - Release/CI/changelog workflow guidance moved from README to `CONTRIBUTING.md`.
 - Release workflow publish step made idempotent (supports updating existing tag releases and replacing artifacts).
+- Release publishing switched to `gh` CLI upsert flow (`create` or `edit+upload --clobber`) with optional `RELEASE_TOKEN` fallback.
 
 ## [1.0.1] - 2026-03-02
 

@@ -55,13 +55,25 @@ jobs:
           bash scripts/extract_changelog_section.sh "${GITHUB_REF_NAME}" > RELEASE_NOTES.md
 
       - name: Publish GitHub release
-        uses: ncipollo/release-action@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ github.ref_name }}
-          name: NetNeighbor ${{ github.ref_name }}
-          bodyFile: RELEASE_NOTES.md
-          artifacts: target/release/netneighbor,target/release/SHA256SUMS.txt
-          artifactErrorsFailBuild: true
-          allowUpdates: true
-          replacesArtifacts: true
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN != '' && secrets.RELEASE_TOKEN || github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release edit "${TAG}" \
+              --title "NetNeighbor ${TAG}" \
+              --notes-file RELEASE_NOTES.md
+            gh release upload "${TAG}" \
+              target/release/netneighbor \
+              target/release/SHA256SUMS.txt \
+              --clobber
+          else
+            gh release create "${TAG}" \
+              target/release/netneighbor \
+              target/release/SHA256SUMS.txt \
+              --title "NetNeighbor ${TAG}" \
+              --notes-file RELEASE_NOTES.md \
+              --verify-tag
+          fi
