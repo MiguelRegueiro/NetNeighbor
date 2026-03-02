@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Release workflow publish step made idempotent (supports updating existing tag releases and replacing artifacts).
 - Release publishing switched to `gh` CLI upsert flow (`create` or `edit+upload --clobber`) with optional `RELEASE_TOKEN` fallback.
 - Release workflow now performs auth preflight checks and supports `GITHUB_TOKEN` by default with optional `RELEASE_TOKEN` override.
+- Release token fallback handling was simplified in shell to avoid expression-evaluation ambiguity in workflow env values.
 
 ## [1.0.1] - 2026-03-02
 

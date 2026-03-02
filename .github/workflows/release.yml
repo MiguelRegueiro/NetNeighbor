@@ -56,18 +56,22 @@ jobs:
 
       - name: Validate release auth
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN != '' && secrets.RELEASE_TOKEN || github.token }}
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          export GH_TOKEN="${RELEASE_TOKEN:-${GITHUB_TOKEN}}"
           gh auth status
           gh api repos/${GITHUB_REPOSITORY} --jq .permissions.push >/dev/null
 
       - name: Publish GitHub release
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN != '' && secrets.RELEASE_TOKEN || github.token }}
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
+          export GH_TOKEN="${RELEASE_TOKEN:-${GITHUB_TOKEN}}"
 
           if gh release view "${TAG}" >/dev/null 2>&1; then
             gh release edit "${TAG}" \
