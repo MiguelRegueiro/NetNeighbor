@@ -55,11 +55,13 @@ jobs:
           bash scripts/extract_changelog_section.sh "${GITHUB_REF_NAME}" > RELEASE_NOTES.md
 
       - name: Publish GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: ncipollo/release-action@v1
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.ref_name }}
           name: NetNeighbor ${{ github.ref_name }}
-          body_path: RELEASE_NOTES.md
-          files: |
-            target/release/netneighbor
-            target/release/SHA256SUMS.txt
-          fail_on_unmatched_files: true
+          bodyFile: RELEASE_NOTES.md
+          artifacts: target/release/netneighbor,target/release/SHA256SUMS.txt
+          artifactErrorsFailBuild: true
+          allowUpdates: true
+          replacesArtifacts: true
