@@ -54,6 +54,14 @@ jobs:
         run: |
           bash scripts/extract_changelog_section.sh "${GITHUB_REF_NAME}" > RELEASE_NOTES.md
 
+      - name: Validate release auth
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN != '' && secrets.RELEASE_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+          gh auth status
+          gh api repos/${GITHUB_REPOSITORY} --jq .permissions.push >/dev/null
+
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN != '' && secrets.RELEASE_TOKEN || github.token }}
@@ -74,6 +82,5 @@ jobs:
               target/release/netneighbor \
               target/release/SHA256SUMS.txt \
               --title "NetNeighbor ${TAG}" \
-              --notes-file RELEASE_NOTES.md \
-              --verify-tag
+              --notes-file RELEASE_NOTES.md
           fi
