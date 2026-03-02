@@ -54,16 +54,6 @@ jobs:
         run: |
           bash scripts/extract_changelog_section.sh "${GITHUB_REF_NAME}" > RELEASE_NOTES.md
 
-      - name: Validate release auth
-        env:
-          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          export GH_TOKEN="${RELEASE_TOKEN:-${GITHUB_TOKEN}}"
-          gh auth status
-          gh api repos/${GITHUB_REPOSITORY} --jq .permissions.push >/dev/null
-
       - name: Publish GitHub release
         env:
           RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
@@ -71,20 +61,133 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          export GH_TOKEN="${RELEASE_TOKEN:-${GITHUB_TOKEN}}"
-
-          if gh release view "${TAG}" >/dev/null 2>&1; then
-            gh release edit "${TAG}" \
-              --title "NetNeighbor ${TAG}" \
-              --notes-file RELEASE_NOTES.md
-            gh release upload "${TAG}" \
-              target/release/netneighbor \
-              target/release/SHA256SUMS.txt \
-              --clobber
-          else
-            gh release create "${TAG}" \
-              target/release/netneighbor \
-              target/release/SHA256SUMS.txt \
-              --title "NetNeighbor ${TAG}" \
-              --notes-file RELEASE_NOTES.md
+          TOKEN="${RELEASE_TOKEN:-${GITHUB_TOKEN}}"
+          if [[ -z "${TOKEN}" ]]; then
+            echo "No token available for release publishing." >&2
+            exit 1
           fi
+
+          API="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+          AUTH_HEADER="Authorization: Bearer ${TOKEN}"
+          ACCEPT_HEADER="Accept: application/vnd.github+json"
+
+          BODY_JSON="$(jq -Rs . < RELEASE_NOTES.md)"
+
+          get_status() {
+            local url="$1"
+            curl -sS -o /tmp/release_resp.json -w "%{http_code}" \
+              -H "${AUTH_HEADER}" \
+              -H "${ACCEPT_HEADER}" \
+              "${url}"
+          }
+
+          post_json() {
+            local url="$1"
+            local data="$2"
+            curl -sS -o /tmp/release_resp.json -w "%{http_code}" \
+              -X POST \
+              -H "${AUTH_HEADER}" \
+              -H "${ACCEPT_HEADER}" \
+              -H "Content-Type: application/json" \
+              --data "${data}" \
+              "${url}"
+          }
+
+          patch_json() {
+            local url="$1"
+            local data="$2"
+            curl -sS -o /tmp/release_resp.json -w "%{http_code}" \
+              -X PATCH \
+              -H "${AUTH_HEADER}" \
+              -H "${ACCEPT_HEADER}" \
+              -H "Content-Type: application/json" \
+              --data "${data}" \
+              "${url}"
+          }
+
+          delete_call() {
+            local url="$1"
+            curl -sS -o /tmp/release_resp.json -w "%{http_code}" \
+              -X DELETE \
+              -H "${AUTH_HEADER}" \
+              -H "${ACCEPT_HEADER}" \
+              "${url}"
+          }
+
+          STATUS="$(get_status "${API}/releases/tags/${TAG}")"
+
+          if [[ "${STATUS}" == "200" ]]; then
+            RELEASE_ID="$(jq -r '.id' /tmp/release_resp.json)"
+            UPDATE_PAYLOAD="$(jq -n --arg name "NetNeighbor ${TAG}" --argjson body "${BODY_JSON}" '{name: $name, body: $body}')"
+            STATUS="$(patch_json "${API}/releases/${RELEASE_ID}" "${UPDATE_PAYLOAD}")"
+            if [[ "${STATUS}" != "200" ]]; then
+              echo "Failed to update release for tag ${TAG}. HTTP ${STATUS}" >&2
+              cat /tmp/release_resp.json >&2
+              exit 1
+            fi
+          elif [[ "${STATUS}" == "404" ]]; then
+            CREATE_PAYLOAD="$(jq -n --arg tag "${TAG}" --arg name "NetNeighbor ${TAG}" --argjson body "${BODY_JSON}" '{tag_name: $tag, name: $name, body: $body, draft: false, prerelease: false}')"
+            STATUS="$(post_json "${API}/releases" "${CREATE_PAYLOAD}")"
+            if [[ "${STATUS}" != "201" ]]; then
+              echo "Failed to create release for tag ${TAG}. HTTP ${STATUS}" >&2
+              cat /tmp/release_resp.json >&2
+              exit 1
+            fi
+            RELEASE_ID="$(jq -r '.id' /tmp/release_resp.json)"
+          else
+            echo "Failed to query release by tag ${TAG}. HTTP ${STATUS}" >&2
+            cat /tmp/release_resp.json >&2
+            exit 1
+          fi
+
+          UPLOAD_URL="$(jq -r '.upload_url' /tmp/release_resp.json | sed 's/{?name,label}//')"
+          if [[ -z "${UPLOAD_URL}" || "${UPLOAD_URL}" == "null" ]]; then
+            STATUS="$(get_status "${API}/releases/${RELEASE_ID}")"
+            if [[ "${STATUS}" != "200" ]]; then
+              echo "Failed to retrieve release upload URL. HTTP ${STATUS}" >&2
+              cat /tmp/release_resp.json >&2
+              exit 1
+            fi
+            UPLOAD_URL="$(jq -r '.upload_url' /tmp/release_resp.json | sed 's/{?name,label}//')"
+          fi
+
+          upload_asset() {
+            local file="$1"
+            local name
+            local asset_id
+            local status
+            name="$(basename "${file}")"
+
+            status="$(get_status "${API}/releases/${RELEASE_ID}/assets")"
+            if [[ "${status}" != "200" ]]; then
+              echo "Failed to list release assets. HTTP ${status}" >&2
+              cat /tmp/release_resp.json >&2
+              exit 1
+            fi
+
+            asset_id="$(jq -r --arg name "${name}" '.[] | select(.name == $name) | .id' /tmp/release_resp.json | head -n1)"
+            if [[ -n "${asset_id}" ]]; then
+              status="$(delete_call "${API}/releases/assets/${asset_id}")"
+              if [[ "${status}" != "204" ]]; then
+                echo "Failed to delete existing asset ${name}. HTTP ${status}" >&2
+                cat /tmp/release_resp.json >&2
+                exit 1
+              fi
+            fi
+
+            status="$(curl -sS -o /tmp/release_resp.json -w "%{http_code}" \
+              -X POST \
+              -H "${AUTH_HEADER}" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary @"${file}" \
+              "${UPLOAD_URL}?name=${name}")"
+
+            if [[ "${status}" != "201" ]]; then
+              echo "Failed to upload asset ${name}. HTTP ${status}" >&2
+              cat /tmp/release_resp.json >&2
+              exit 1
+            fi
+          }
+
+          upload_asset target/release/netneighbor
+          upload_asset target/release/SHA256SUMS.txt
